@@ -152,13 +152,13 @@ def get_savename(subj, montage, session, exp):
     if not os.path.exists(main_dir):
         # if installed with pip
         main_dir = __file__.split('TH_EventReader.py')[0] + 'data/'
+        if not os.path.exists(main_dir):
+            os.mkdir(main_dir)
     exp_dir = main_dir + exp + '/'
     if not os.path.exists(exp_dir):
-        print(f'Creating {exp_dir}')
         os.mkdir(exp_dir) 
     subj_dir = exp_dir + subj + '/'
     if not os.path.exists(subj_dir):
-        print(f'Creating {subj_dir}')
         os.mkdir(subj_dir)
     return subj_dir + f'session_{session}.pkl'
 
