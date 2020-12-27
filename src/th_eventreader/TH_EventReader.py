@@ -149,6 +149,9 @@ def get_savename(subj, montage, session, exp):
     if montage > 0:
         subj = f'{subj}_{montage}'
     main_dir = __file__.split('src')[0] + 'data/'
+    if not os.path.exists(main_dir):
+        # if installed with pip
+        main_dir = __file__.split('TH_EventReader.py')[0] + 'data/'
     exp_dir = main_dir + exp + '/'
     if not os.path.exists(exp_dir):
         print(f'Creating {exp_dir}')
