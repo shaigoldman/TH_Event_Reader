@@ -5,8 +5,9 @@
 # 
 # This code will load TH events using cmlreaders and then find the missing path data using the log files.
 
-import numpy as np
 import os
+import warnings
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from cmlreaders import CMLReader, get_data_index
@@ -147,7 +148,7 @@ def read_path_log(events):
 def get_savename(subj, montage, session, exp):
     if montage > 0:
         subj = f'{subj}_{montage}'
-    main_dir = os.getcwd() + '/data/'
+    main_dir = __file__.split('src')[0] + 'data/'
     exp_dir = main_dir + exp + '/'
     if not os.path.exists(exp_dir):
         print(f'Creating {exp_dir}')
@@ -202,7 +203,9 @@ def get_monts_and_sess_pairs(subj, exp='TH1'):
 
 
 def exp_df(exp='TH1'):
+    warnings.filterwarnings('ignore')
     df = get_data_index("r1")
     df = df[df['experiment'] == exp]
     df['subj'] = df.pop('subject')
+    warnings.resetwarnings()
     return df[['subj', 'montage', 'session']]
