@@ -146,6 +146,17 @@ def read_path_log(events):
 
 
 def get_savename(subj, montage, session, exp):
+    """ Returns a relavent file path for saving events data.
+        
+        Args:
+            subj (str)
+            montage (int)
+            session (int)
+            exp (str)
+        
+        Returns:
+            str file path ending in '.pkl'
+    """
     if montage > 0:
         subj = f'{subj}_{montage}'
     main_dir = __file__.split('src')[0] + 'data/'
@@ -164,17 +175,33 @@ def get_savename(subj, montage, session, exp):
 
 
 def save_events(events, subj, montage, session, exp):
+    """ Saves the events in the relevant file path.
+    """
     fname = get_savename(subj, montage, session, exp)
     events.to_pickle(fname)
     
 
 def load_events(subj, montage, session, exp):
+    """Loads the events from the relevant file path."""
     return pd.read_pickle(get_savename(subj, montage, session, exp))
 
 
 def get_events(subj, montage, session, exp, 
                recalc=False, save=True):
-    """Returns the reformatted events df for subj and mont."""
+    """ Returns the reformatted events df with 'pathInfo'.
+        
+        Args:
+            subj (str)
+            montage (int)
+            session (int)
+            exp (str)
+            recalc (bool): If False, attempts to load presaved data.
+            save (bool): If True, will save the events in a filepath
+                determined by `get_savename`.
+        
+        Returns:
+            pd.DataFrame containing events
+    """
     if not recalc:
         save_fname = get_savename(subj, montage, session, exp)
         if os.path.exists(save_fname):
@@ -206,9 +233,13 @@ def get_monts_and_sess_pairs(subj, exp='TH1'):
 
 
 def exp_df(exp='TH1'):
+    """ Returns a df with ['subj', 'montage', 'session', 'exp']
+        for each subj in this experiment. Use this for iterations.
+    """
     warnings.filterwarnings('ignore')
     df = get_data_index("r1")
     df = df[df['experiment'] == exp]
     df['subj'] = df.pop('subject')
+    df['exp'] = df.pop('experiment')
     warnings.resetwarnings()
-    return df[['subj', 'montage', 'session']]
+    return df[['subj', 'montage', 'session', 'exp']]
