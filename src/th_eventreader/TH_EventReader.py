@@ -69,12 +69,13 @@ def read_path_log(events):
     """
     #-----Setup
     monts_and_sess = events[['subject_alias', 'original_session_ID']].drop_duplicates()
+    exp = events['experiment'].iloc[0]
     #------This array will hold all the path data:
     all_pathInfo = []
     #------Iterate sessions bc each has its own par file
     for (index, (subj_str, sess)) in monts_and_sess.iterrows():
         #------Read the par log file
-        par_file = f'/data10/RAM/subjects/{subj_str}/behavioral/TH1/session_{sess}/playerPaths.par'
+        par_file = f'/data10/RAM/subjects/{subj_str}/behavioral/{exp}/session_{sess}/playerPaths.par'
         with open(par_file) as f:
             lines = f.read().split('\n')
         #------Init tracking vars
@@ -113,36 +114,8 @@ def read_path_log(events):
                 event_pathInfo.append(path_data)
         if event_pathInfo:
             all_pathInfo.append(event_pathInfo)
-    #------Organize nav events by the overall events struct
-    ordered_pathInfo = []
-    event_num = 0
-    for pathInfo in all_pathInfo:
-        start_time = pathInfo[0]['mstime']
-        # see which event is most assosiated in start-time with this nav vector:
-        for index, mstime in events['mstime'][event_num:].iteritems():
-            this_dist = np.abs(start_time-events['mstime'][index])
-            try:
-                next_dist = np.abs(start_time-events['mstime'][index+1])
-            except KeyError: # no more events exist
-                next_dist = np.inf
-            if this_dist <= next_dist:
-                # this event is most closely associated with this index
-                ordered_pathInfo.append(pathInfo)
-                event_num += 1
-                break
-            else:
-                # this event is more closely associated with a future index
-                # that means that there are some non-nav events in between
-                # so we add those as empty nav vectors
-                ordered_pathInfo.append([])
-                event_num += 1
-    # Add the non-nav events that occur after all nav events are over
-    while len(ordered_pathInfo) < len(events):
-        ordered_pathInfo.append([])
-    #------Convert to pd.Series
-    ordered_pathInfo = pd.DataFrame(data=pd.Series(ordered_pathInfo, index=events.index), columns=['pathInfo'])
-    #------Done!
-    return ordered_pathInfo
+            
+    return all_pathInfo
 
 
 def get_savename(subj, montage, session, exp):
@@ -187,6 +160,7 @@ def load_events(subj, montage, session, exp):
 
 
 def get_events(subj, montage, session, exp, 
+               etype_w_path='CHEST',
                recalc=False, save=True):
     """ Returns the reformatted events df with 'pathInfo'.
         
@@ -195,6 +169,8 @@ def get_events(subj, montage, session, exp,
             montage (int)
             session (int)
             exp (str)
+            etype_w_path (str): What types of events in this paradigm
+                should we expect to find associated path data for.
             recalc (bool): If False, attempts to load presaved data.
             save (bool): If True, will save the events in a filepath
                 determined by `get_savename`.
@@ -202,6 +178,7 @@ def get_events(subj, montage, session, exp,
         Returns:
             pd.DataFrame containing events
     """
+    
     if not recalc:
         save_fname = get_savename(subj, montage, session, exp)
         if os.path.exists(save_fname):
@@ -211,7 +188,8 @@ def get_events(subj, montage, session, exp,
                 pass
         
     events = get_cmlevents(subj, montage, session, exp)
-    events['pathInfo'] = read_path_log(events)
+    events['pathInfo'] = [np.array([], dtype='object') for i in range(len(events))]
+    events.loc[events['type']==etype_w_path, 'pathInfo'] = np.asarray(read_path_log(events), dtype='object')
     
     if save:
         save_events(events, subj, montage, session, exp)
