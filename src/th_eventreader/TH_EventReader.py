@@ -64,27 +64,44 @@ def read_path_log(events):
                 and 'original_session_ID', and event info.
         
         Returns
-            pd.DataFrame with one field 'pathData', with the same index
-                as events.
+            pd.DataFrame of events with added 'pathInfo' column
     """
     #-----Setup
+    events = events.copy()
     monts_and_sess = events[['subject_alias', 'original_session_ID']].drop_duplicates()
     exp = events['experiment'].iloc[0]
     #------This array will hold all the path data:
-    all_pathInfo = []
+    events['pathInfo'] = [[] for i in range(len(events))]
+    def add_path_info(trial, chestNum, pathInfo):
+        """Helper method to insert pathInfo to events df."""
+        locs = ((events['trial']==trial)
+                &(events['chestNum']==chestNum))
+        if events.loc[locs].empty:
+            # sometimes there's a path that doesn't correlate to an event
+            # for example if he ran out of time before reaching the chest
+            return
+        # need to ignore settingWithCopyWarning here
+        pd.set_option('mode.chained_assignment',None)
+        for i, event in events[locs].iterrows():
+            events['pathInfo'].loc[i] = pathInfo
+        pd.reset_option("mode.chained_assignment")
     #------Iterate sessions bc each has its own par file
     for (index, (subj_str, sess)) in monts_and_sess.iterrows():
         #------Read the par log file
-        par_file = f'/data10/RAM/subjects/{subj_str}/behavioral/{exp}/session_{sess}/playerPaths.par'
+        par_file = (f'/data10/RAM/subjects/{subj_str}'
+                    f'/behavioral/{exp}/session_{sess}/playerPaths.par')
         with open(par_file) as f:
             lines = f.read().split('\n')
         #------Init tracking vars
-        current_event = events.index[0]
         current_event_start = 0
+        trial = '?'
+        chestNum = '?'
         event_pathInfo = []
         #------Go through the log file data
         for line_num, line in enumerate(lines):
             #------Collect the path data in this line of the log file
+            # the log file has lines containing [mstime, event_start_mstime, mstime_relative_to_event_start,
+            #                                    trial, chestNum, x, y, heading]
             # this dict will eventually have the keys: ['mstime', 'x', 'y', 'heading']
             path_data = {} 
             for index, token in enumerate(line.split('\t')): # see each datum in line
@@ -99,11 +116,17 @@ def read_path_log(events):
                     #------Check if on a new event
                     if token_event_start > current_event_start:
                         if current_event_start > 0: # if its 0 that means we are on 1st line of log file
-                            # add this event's pathInfo to all the events path info
-                            all_pathInfo.append(event_pathInfo)
+                            # add this event's pathInfo to the events df
+                            add_path_info(trial, chestNum, event_pathInfo)
                             event_pathInfo = []
-                            current_event += 1
                         current_event_start = token_event_start
+                elif index == 3:
+                    trial = int(token)
+                elif index == 4:
+                    # this is the chestNum. It is logged at starting
+                    # from chest 0, but in python events the first chest
+                    # has chestNum 1, so we need to add 1 to the value
+                    chestNum = int(token)+1
                 elif index == 5: # player x position
                     path_data['x'] = float(token)
                 elif index == 6: # player y postion
@@ -113,9 +136,9 @@ def read_path_log(events):
             if path_data: # add this data to the event's pathInfo
                 event_pathInfo.append(path_data)
         if event_pathInfo:
-            all_pathInfo.append(event_pathInfo)
+            add_path_info(trial, chestNum, event_pathInfo)
             
-    return all_pathInfo
+    return events
 
 
 def get_savename(subj, montage, session, exp):
@@ -159,8 +182,7 @@ def load_events(subj, montage, session, exp):
     return pd.read_pickle(get_savename(subj, montage, session, exp))
 
 
-def get_events(subj, montage, session, exp, 
-               etype_w_path='CHEST',
+def get_events(subj, montage, session, exp,
                recalc=False, save=True):
     """ Returns the reformatted events df with 'pathInfo'.
         
@@ -188,9 +210,9 @@ def get_events(subj, montage, session, exp,
                 pass
         
     events = get_cmlevents(subj, montage, session, exp)
-    events['pathInfo'] = [np.array([], dtype='object') for i in range(len(events))]
-    events.loc[events['type']==etype_w_path, 'pathInfo'] = np.asarray(read_path_log(events), dtype='object')
     
+    events = read_path_log(events)
+
     if save:
         save_events(events, subj, montage, session, exp)
         
