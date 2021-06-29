@@ -191,8 +191,6 @@ def get_events(subj, montage, session, exp,
             montage (int)
             session (int)
             exp (str)
-            etype_w_path (str): What types of events in this paradigm
-                should we expect to find associated path data for.
             recalc (bool): If False, attempts to load presaved data.
             save (bool): If True, will save the events in a filepath
                 determined by `get_savename`.
