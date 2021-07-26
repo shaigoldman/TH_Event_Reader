@@ -52,6 +52,81 @@ def get_cmlevents(subj, montage=None, session=None, exp='TH1'):
     events = reader.load('events')
     events['original_session_ID'] = orig_sess_ID
     events['subject_alias'] = subject_alias
+    
+    # remove the unhelpful and inconsistent SESS_START event
+    events = events[events['type'] != 'SESS_START']
+    
+    return events
+
+
+def get_baseline_mstimes(events):
+    """ Reads the .txt logfile to find the start and end mstimes
+        For all baseline periods. As defined in Miller et. al (2018),
+        baseline periods for TH are the time at the start of a trial
+        before nvavigation.
+        
+        Args:
+            events (pd.DataFrame)
+        
+        Returns:
+            events (pd.DataFrame) with added fields:
+                ['baseline_start', 'baseline_end']
+    """
+    
+    events = events.copy()
+    
+    monts_and_sess = events[['subject_alias', 'original_session_ID']].drop_duplicates()
+    exp = events['experiment'].iloc[0]
+    
+    # get the baseline data
+    base_dfs = []
+    for (index, (subj_str, sess)) in monts_and_sess.iterrows():
+
+        log_file = (f'/data10/RAM/subjects/{subj_str}'
+                    f'/behavioral/{exp}/session_{sess}/{subj_str}Log.txt')
+
+        with open(log_file, 'r') as f:
+            log = f.read().split('\n')
+
+        baseline_starts = []
+        baseline_ends = []
+        current_start = np.nan
+
+        for line in log:
+            tokens = line.split('\t')
+            for i, token in enumerate(tokens):
+                # whichever of these start tokens appears
+                # last before the nav will be the baseline start period
+                # this is because its a little inconsistent about which appears
+                if (token == 'HOMEBASE_TRANSPORT_ENDED' 
+                    or token ==  'HOMEBASE_TRANSPORT_STARTED'
+                    or token == 'SHOWING_INSTRUCTIONS'
+                   ):
+                    current_start = int(tokens[0])
+                elif token == 'TRIAL_NAVIGATION_STARTED':
+                    baseline_ends.append(int(tokens[0]))
+                    baseline_starts.append(current_start)
+
+        base_dfs.append(pd.DataFrame(
+            {'baseline_start': baseline_starts, 'baseline_end': baseline_ends, 
+             'session': sess}))
+                
+
+    # put the baseline data into the events
+    events['baseline_start'] = np.nan
+    events['baseline_end'] = np.nan
+
+    for df in base_dfs:
+        sess_locs = events['original_session_ID']==df['session'].iloc[0]
+        for trial in events[sess_locs]['trial'].unique():
+            events.loc[sess_locs&(events['trial']==trial),
+                'baseline_start'] = df.loc[trial, 'baseline_start']
+            events.loc[sess_locs&(events['trial']==trial),
+                'baseline_end'] = df.loc[trial, 'baseline_end']
+
+    events['baseline_start'] = events['baseline_start'].astype(int)
+    events['baseline_end'] = events['baseline_end'].astype(int)
+    
     return events
 
 
@@ -206,8 +281,10 @@ def get_events(subj, montage, session, exp,
                 return load_events(subj, montage, session, exp)
             except:
                 pass
-        
+    
     events = get_cmlevents(subj, montage, session, exp)
+    
+    events = get_baseline_mstimes(events)
     
     events = read_path_log(events)
 
