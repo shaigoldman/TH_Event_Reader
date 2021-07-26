@@ -318,3 +318,19 @@ def exp_df(exp='TH1'):
     df['exp'] = df.pop('experiment')
     warnings.resetwarnings()
     return df[['subj', 'montage', 'session', 'exp']]
+
+
+def reload_all(exp):
+    """ Reloads all events from a particular experiment. Helpful if the events have
+        been previously loaded and saved with an older version of TH_EventReader.
+    """
+    
+    df = exp_df(exp)
+    
+    for i, row in df.iterrows():
+        print([key for key in row], end=' -> ')
+        try:
+            events = get_events(**row, recalc=True)
+            print('Success!')
+        except FileNotFoundError as e:
+            print(e)
