@@ -216,6 +216,51 @@ def read_path_log(events):
     return events
 
 
+def get_nav_epochs(path):
+    """ Given path data of 1 event, determine the start
+        and end of the navigation epoch.
+        
+        Args:
+            path (list): list of path datapoints each containing
+                ['mstime', 'x', 'y', 'heading']
+        
+        Returns:
+            move_start (int): start of the nav epoch, in mstime.
+            move_end (int): end of the nav epoch, in msitme.
+    """
+    xs = [p['x'] for p in path]
+    ys = [p['y'] for p in path]
+    dirs = [p['heading'] for p in path]
+    ts = [p['mstime'] for p in path]
+
+    started = False
+    move_start = ts[-1]
+    move_end = ts[-1]
+    ending_pos = [np.nan,np.nan,np.nan]
+    for i, (x,y,d,t) in enumerate(zip(xs, ys, dirs, ts)):
+        # determine if one of the xyd have changed,
+        # that means movement has started
+        if ((i>0) and
+            ((x!=xs[i-1])
+             or (y!=ys[i-1])
+             or (d!=dirs[i-1])
+                )):
+            move_start = t
+            started = True
+        elif started:
+            # subj has started movement and is now stopped/paused
+            pos = [x,y,d]
+            if pos != ending_pos:
+                # if pos is ending_pos this is just a continuation of the
+                # break in movement, not a new break. We want to find the
+                # final movement break, so we rewrite the move_end for each
+                # new movement break we encounter.
+                move_end = t
+                ending_pos = pos
+    
+    return move_start, move_end
+
+
 def get_savename(subj, montage, session, exp):
     """ Returns a relavent file path for saving events data.
         
@@ -284,9 +329,21 @@ def get_events(subj, montage, session, exp,
     
     events = get_cmlevents(subj, montage, session, exp)
     
+    # get baselines
     events = get_baseline_mstimes(events)
     
+    # get path
     events = read_path_log(events)
+    
+    # get nav epochs
+    move_starts = []
+    move_ends = []
+    for i, event in events.iterrows():
+        move_start, move_end = get_nav_epochs(event['pathInfo'])
+        move_starts.append(move_start)
+        move_ends.append(move_end)
+    events['move_start'] = move_starts
+    events['move_ends'] = move_ends
 
     if save:
         save_events(events, subj, montage, session, exp)
