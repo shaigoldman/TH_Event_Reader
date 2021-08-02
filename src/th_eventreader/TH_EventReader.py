@@ -342,8 +342,8 @@ def get_events(subj, montage, session, exp,
         move_start, move_end = get_nav_epochs(event['pathInfo'])
         move_starts.append(move_start)
         move_ends.append(move_end)
-    events['move_start'] = move_starts
-    events['move_ends'] = move_ends
+    events['nav_start'] = move_starts
+    events['nav_end'] = move_ends
 
     if save:
         save_events(events, subj, montage, session, exp)
