@@ -1,8 +1,8 @@
 # TH_Event_Reader
 
-This git package will read TH events from Rhino with their pathInfo. It requires access to the (http://memory.psych.upenn.edu/Main_Page)[Computational Memory Lab]'s RAM data from their "Rhino" server to use.
+This git package will read TH events from Rhino with their pathInfo. It requires access to the [Computational Memory Lab](http://memory.psych.upenn.edu/Main_Page)'s RAM data from their "Rhino" server to use.
 
-Currently (https://github.com/pennmem/cmlreaders/tree/master/cmlreaders)[cmlreaders] cannot read pathInfo, so I created this. It also includes some other
+Currently [cmlreaders](https://github.com/pennmem/cmlreaders/tree/master/cmlreaders) cannot read pathInfo, so I created this. It also includes some other
 helpful pathinfo like baseline start and stop ms times.
 
 To install:
